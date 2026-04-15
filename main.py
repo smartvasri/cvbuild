@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from resume_parser import extract_text
-from ai_pipeline import analyze_resume, GEMINI_MODEL
+from ai_pipeline import analyze_resume, GEMINI_MODEL, NotAResumeError
 
 # ─────────────────────────────────────────────
 # App
@@ -91,6 +91,11 @@ async def analyze(file: UploadFile = File(...)):
         result = analyze_resume(resume_text)
     except EnvironmentError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    except NotAResumeError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"NOT_A_RESUME|{e.document_type}|{e.reason}",
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=429, detail=str(e))
     except ValueError as e:
