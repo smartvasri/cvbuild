@@ -9,7 +9,9 @@ Get a free key at: https://aistudio.google.com/app/apikey
 import os
 import json
 import re
+import time
 import google.generativeai as genai
+from google.api_core.exceptions import ResourceExhausted
 
 
 # ─────────────────────────────────────────────
@@ -76,9 +78,9 @@ def analyze_resume(resume_text: str) -> dict:
     # Configure the Gemini SDK
     genai.configure(api_key=api_key)
 
-    # Use gemini-2.0-flash — fast, free-tier friendly, and currently supported
+    # Use gemini-1.5-flash — fast, cost-effective, and widely available
     model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
+        model_name="gemini-1.5-flash",
         generation_config={
             "temperature": 0.3,      # Low temp for consistent, factual output
             "top_p": 0.9,
@@ -86,9 +88,31 @@ def analyze_resume(resume_text: str) -> dict:
         },
     )
 
-    # Build and send the prompt
+    # Build and send the prompt — retry up to 3 times on per-minute quota errors
     prompt = ATS_ANALYSIS_PROMPT.format(resume_text=resume_text[:8000])  # Trim to ~8k chars
-    response = model.generate_content(prompt)
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(prompt)
+            break
+        except ResourceExhausted as e:
+            err_str = str(e)
+            # Per-day quota is exhausted — no point retrying
+            if "PerDay" in err_str:
+                raise RuntimeError(
+                    "The Gemini API daily quota has been reached. "
+                    "Please try again tomorrow or upgrade to a paid API plan."
+                ) from e
+            # Per-minute rate limit — back off and retry
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt * 5)  # 5s, 10s, 20s
+            else:
+                raise RuntimeError(
+                    "The Gemini API is temporarily rate-limited. "
+                    "Please wait a minute and try again."
+                ) from e
+
     raw_text = response.text.strip()
 
     # Strip markdown code fences if Gemini wraps the JSON anyway
