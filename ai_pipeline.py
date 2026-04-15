@@ -76,9 +76,9 @@ def analyze_resume(resume_text: str) -> dict:
     # Configure the Gemini SDK
     genai.configure(api_key=api_key)
 
-    # Use gemini-1.5-flash — fast and free-tier friendly
+    # Use gemini-2.0-flash — fast, free-tier friendly, and currently supported
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-2.0-flash",
         generation_config={
             "temperature": 0.3,      # Low temp for consistent, factual output
             "top_p": 0.9,
